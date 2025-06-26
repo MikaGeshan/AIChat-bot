@@ -17,6 +17,8 @@ import { sendAIMessage } from '../services/sendAIMessage';
 import TextInput from './TextInput';
 
 const ChatBox = forwardRef((_props, ref) => {
+  const scrollRef = useRef();
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -24,8 +26,6 @@ const ChatBox = forwardRef((_props, ref) => {
         "Hello! I'm your AI Insurance Assistant. I'm here to help you with claims, quotes, policy information, and answer any insurance questions you might have. How can I assist you today?",
     },
   ]);
-
-  const scrollRef = useRef();
 
   const handleSend = async text => {
     const userMessage = { role: 'user', content: text };
