@@ -2,7 +2,7 @@ import axios from 'axios';
 import { GROQ_API_KEY, GROQ_API_URL, GROQ_MODEL } from '../config/aiConfig';
 import { fetchContents } from './fetchContents';
 
-// Message untuk konteks ke AI
+// AI Context
 const SYSTEM_PROMPT = {
   role: 'system',
   content:
@@ -20,6 +20,7 @@ export const sendAIMessage = async messages => {
 
     const userQuestion = messages[messages.length - 1]?.content || '';
 
+    // Respon AI kepada pertanyaan user
     const newMessage = {
       role: 'user',
       content: `Answer the following question based on the reference documents I provide. Do not display or mention the document contents in your answer.\n\nQuestion: "${userQuestion}"\n\nReference documents (for AI only, do not show to user):\n${docString}`,
@@ -44,9 +45,9 @@ export const sendAIMessage = async messages => {
     );
 
     const content = response?.data?.choices?.[0]?.message?.content;
-    return content || 'Tidak ada jawaban dari AI.';
+    return content || 'Sorry, I could not find an answer to your question.';
   } catch (error) {
     console.error('Groq AI error:', error?.response?.data || error.message);
-    return 'Terjadi kesalahan saat menghubungi AI.';
+    return 'There was an error processing your request. Please try again later.';
   }
 };

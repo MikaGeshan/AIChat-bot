@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { GITHUB_URL, EXCLUDE_FILES } from '../config/githubConfig';
+import { GITHUB_URL } from '../config/githubConfig';
 
 export async function fetchContents() {
   try {
@@ -10,10 +10,8 @@ export async function fetchContents() {
       return [];
     }
 
-    // Filter file
-    let filtered = data.filter(file => {
-      return file.download_url && !EXCLUDE_FILES.includes(file.name);
-    });
+    // Filter file menurut extension .txt
+    let filtered = data.filter(file => file.download_url);
 
     filtered = filtered.sort((a, b) => {
       const aIsTxt = a.name.endsWith('.txt') ? -1 : 1;
@@ -26,6 +24,7 @@ export async function fetchContents() {
       filtered.map(f => f.name),
     );
 
+    // Fetch file yang ada
     const contents = await Promise.all(
       filtered.map(async file => {
         try {
@@ -38,7 +37,7 @@ export async function fetchContents() {
           console.error(`Error fetching ${file.name}:`, err.message);
           return {
             name: file.name,
-            content: '[Gagal membaca isi file]',
+            content: '[Error reading file]',
           };
         }
       }),
