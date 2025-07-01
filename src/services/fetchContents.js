@@ -109,40 +109,40 @@ const getCachedText = async url => {
 };
 
 export const fetchContents = async (url, title = 'default') => {
-  console.log(`🔍 fetchContents called for: ${title}`);
+  console.log(`fetchContents called for: ${title}`);
   try {
     // Cek cache
     const cached = await getCachedText(title);
     if (cached && cached.trim().length > 50) {
-      console.log(`🟢 Fetched from cache: ${title}`);
+      console.log(`Fetched from cache: ${title}`);
       return cached;
     }
 
     // Kalau tidak ada cache, baru lanjut proses
-    console.log(`📥 Downloading PDF for: ${title}`);
+    console.log(`Downloading PDF for: ${title}`);
     const filePath = await downloadPDF(url);
-    console.log(`✅ Success Downloaded: ${filePath}`);
+    console.log(`Success Downloaded: ${filePath}`);
 
     const uploadedUrl = await uploadPDFtoPDFco(filePath);
     if (!uploadedUrl) {
-      console.error(`❌ Gagal upload PDF: ${title}`);
+      console.error(` Gagal upload PDF: ${title}`);
       return null;
     }
 
-    console.log(`🔗 Presigned URL: ${uploadedUrl}`);
+    console.log(`Presigned URL: ${uploadedUrl}`);
 
     const parsedText = await convertPDFUrlToText(uploadedUrl);
     if (!parsedText || parsedText.trim().length < 50) {
-      console.error(`❌ Parsing gagal atau hasil kosong untuk: ${title}`);
+      console.error(`Parsing gagal atau hasil kosong untuk: ${title}`);
       return null;
     }
 
     // Simpan ke cache
     await cachedText(title, parsedText);
-    console.log(`✅ Parsed & cached: ${title}`);
+    console.log(`Parsed & cached: ${title}`);
     return parsedText;
   } catch (err) {
-    console.error(`🚨 Error fetchContents(${title}):`, err.message || err);
+    console.error(`Error fetchContents(${title}):`, err.message || err);
     return null;
   }
 };

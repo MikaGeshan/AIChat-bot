@@ -23,7 +23,7 @@ export const sendAIMessage = async messages => {
 
     const question = userMessage.content;
 
-    // Gunakan konteks sebelumnya jika cocok
+    // cocokin dengan konteks sebelumnya
     const keywords = question.toLowerCase().split(/\s+/);
     const isFollowUp =
       lastContext.title &&
@@ -33,13 +33,13 @@ export const sendAIMessage = async messages => {
 
     if (isFollowUp) {
       matchedDoc = lastContext;
-      console.log('🔁 Using previous context:', matchedDoc.title);
+      console.log('Using previous context:', matchedDoc.title);
     } else {
       const res = await axios.get(LIST_JSON_URL);
       const list = res.data;
 
       const bestMatch = await matchList(question, list);
-      if (!bestMatch) return 'Maaf, tidak ditemukan dokumen yang relevan.';
+      if (!bestMatch) return 'Sorry, no relevant documents.';
 
       matchedDoc = {
         title: bestMatch.title,
@@ -51,7 +51,7 @@ export const sendAIMessage = async messages => {
 
       lastContext = matchedDoc;
       console.log(
-        `✅ New document matched: ${matchedDoc.title} (via ${bestMatch.reason})`,
+        `New document matched: ${matchedDoc.title} (via ${bestMatch.reason})`,
       );
     }
 
@@ -83,10 +83,10 @@ export const sendAIMessage = async messages => {
 
     return (
       aiRes.data.choices[0]?.message?.content?.trim() ||
-      'Maaf, AI tidak menemukan jawaban yang sesuai.'
+      'Sorry no match answer.'
     );
   } catch (err) {
     console.error('sendAIMessage error:', err.message || err);
-    return 'Terjadi kesalahan pada AI. Silakan coba lagi nanti.';
+    return 'Theres something wrong with the AI, try again later.';
   }
 };

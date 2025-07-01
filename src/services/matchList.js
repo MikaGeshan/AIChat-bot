@@ -1,6 +1,6 @@
 import { fetchContents } from './fetchContents';
 
-// Stopwords untuk penyaringan keyword
+// saring keyword
 const stopwords = new Set([
   'apa',
   'yang',
@@ -45,11 +45,11 @@ export const matchList = async (question, list) => {
     const titleScore = titleMatchCount / keywords.length;
 
     if (titleScore > 0.4) {
-      console.log(`📌 Match found by title: ${item.title}`);
+      console.log(`Match found by title: ${item.title}`);
       return { ...item, score: titleScore, reason: 'title' };
     }
 
-    // Coba baca isi dokumen dan cocokkan keyword
+    // cocokin keyword dengan dokumen
     const parsed = await fetchContents(item.url, item.title);
     if (!parsed) continue;
 
