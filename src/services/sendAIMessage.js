@@ -1,49 +1,92 @@
 import axios from 'axios';
 import { GROQ_API_KEY, GROQ_API_URL, GROQ_MODEL } from '../config/aiConfig';
+import { LIST_JSON_URL } from '../config/githubConfig';
 import { fetchContents } from './fetchContents';
+import { matchList } from './matchList';
 
-// AI Context
+let lastContext = {
+  title: null,
+  url: null,
+  parsedText: null,
+};
+
 const SYSTEM_PROMPT = {
   role: 'system',
   content:
     'You are an AI Insurance Assistant. You will answer user questions based on the insurance-related documents provided. If the document includes the question and the answer, use it. If not found, say sorry. Don’t guess if the information isn’t there.',
 };
 
-export const sendAIMessage = async userQuestion => {
+export const sendAIMessage = async messages => {
   try {
-    const documentText = await fetchContents();
-    if (!documentText) {
-      throw new Error('Error fetching document contents');
+    const userMessage = messages.find(msg => msg.role === 'user');
+    if (!userMessage) throw new Error('No user message found');
+
+    const question = userMessage.content;
+
+    // Gunakan konteks sebelumnya jika cocok
+    const keywords = question.toLowerCase().split(/\s+/);
+    const isFollowUp =
+      lastContext.title &&
+      keywords.some(word => lastContext.title.toLowerCase().includes(word));
+
+    let matchedDoc;
+
+    if (isFollowUp) {
+      matchedDoc = lastContext;
+      console.log('🔁 Using previous context:', matchedDoc.title);
+    } else {
+      const res = await axios.get(LIST_JSON_URL);
+      const list = res.data;
+
+      const bestMatch = await matchList(question, list);
+      if (!bestMatch) return 'Maaf, tidak ditemukan dokumen yang relevan.';
+
+      matchedDoc = {
+        title: bestMatch.title,
+        url: bestMatch.url,
+        parsedText:
+          bestMatch.parsedText ||
+          (await fetchContents(bestMatch.url, bestMatch.title)),
+      };
+
+      lastContext = matchedDoc;
+      console.log(
+        `✅ New document matched: ${matchedDoc.title} (via ${bestMatch.reason})`,
+      );
     }
 
-    const userPrompt = {
-      role: 'user',
-      content: `Berdasarkan informasi yang saya dapatkan dari database perusahaan:\n\n"""${documentText}"""\n\nPertanyaan saya:\n${userQuestion}\n\nTolong jawab sesuai dengan pertanyaan yang dilempar oleh user.`,
-    };
+    const finalMessages = [
+      SYSTEM_PROMPT,
+      {
+        role: 'user',
+        content:
+          `Saya memiliki dokumen berikut yang berisi informasi penting:\n\n` +
+          matchedDoc.parsedText +
+          `\n\nBerdasarkan dokumen di atas, mohon bantu jawab pertanyaan ini:\n"${question}"` +
+          `\n\nJika jawabannya tidak ditemukan secara eksplisit dalam dokumen, jawab: "Maaf, saya tidak menemukan jawaban dalam dokumen."`,
+      },
+    ];
 
-    const response = await axios.post(
+    const aiRes = await axios.post(
       GROQ_API_URL,
       {
+        messages: finalMessages,
         model: GROQ_MODEL,
-        messages: [SYSTEM_PROMPT, userPrompt],
-        temperature: 0.2,
-        max_tokens: 1024,
       },
       {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
         },
       },
     );
 
-    const aiMessage = response.data?.choices?.[0]?.message?.content;
-    return aiMessage || 'No answer from AI.';
-  } catch (error) {
-    console.error(
-      'Error while sending to AI:',
-      error.response?.data || error.message,
+    return (
+      aiRes.data.choices[0]?.message?.content?.trim() ||
+      'Maaf, AI tidak menemukan jawaban yang sesuai.'
     );
-    return 'Theres an error while sending to AI.';
+  } catch (err) {
+    console.error('sendAIMessage error:', err.message || err);
+    return 'Terjadi kesalahan pada AI. Silakan coba lagi nanti.';
   }
 };

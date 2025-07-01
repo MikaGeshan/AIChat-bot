@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  forwardRef,
-  useImperativeHandle,
-} from 'react';
+import React, { useState, useRef, useEffect, forwardRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -29,19 +23,15 @@ const ChatBox = forwardRef((_props, ref) => {
 
   const handleSend = async text => {
     const userMessage = { role: 'user', content: text };
+    console.log(userMessage);
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    const aiReply = await sendAIMessage(text);
+    const aiReply = await sendAIMessage([userMessage]);
+    console.log(sendAIMessage);
 
     setMessages(prev => [...prev, { role: 'assistant', content: aiReply }]);
   };
-
-  useImperativeHandle(ref, () => ({
-    sendMessage: text => {
-      handleSend(text);
-    },
-  }));
 
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });

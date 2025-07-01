@@ -1,18 +1,14 @@
 import RNFS from 'react-native-fs';
 import axios from 'axios';
 import { Buffer } from 'buffer';
+import { PDFCO_APIKEY } from '../config/folderConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const fileId = '18HORC8jkbzoxJeyt7XZLdVRxsgErYtoo';
-const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-const cachePath = `${RNFS.CachesDirectoryPath}/sample.pdf`;
+const downloadPDF = async (url, filename = 'sample.pdf') => {
+  const cachePath = `${RNFS.CachesDirectoryPath}/${filename}`;
 
-const apiKey =
-  'mikageshan@gmail.com_c0ThkPp475DMSMmwjn9c6wBDV2TR7DyIZLAuEuR8Lxbum6iKNhpyydAit38Nbwq9';
-
-const downloadPDF = async () => {
   const result = await RNFS.downloadFile({
-    fromUrl: downloadUrl,
+    fromUrl: url,
     toFile: cachePath,
   }).promise;
 
@@ -36,7 +32,7 @@ const uploadPDFtoPDFco = async filePath => {
           contenttype: 'application/pdf',
         },
         headers: {
-          'x-api-key': apiKey,
+          'x-api-key': PDFCO_APIKEY,
         },
       },
     );
@@ -69,7 +65,7 @@ const convertPDFUrlToText = async pdfUrl => {
       },
       {
         headers: {
-          'x-api-key': apiKey,
+          'x-api-key': PDFCO_APIKEY,
           'Content-Type': 'application/json',
         },
       },
@@ -89,18 +85,22 @@ const convertPDFUrlToText = async pdfUrl => {
   }
 };
 
-const cachedText = async text => {
+const generateCacheKey = url => `cached_text_${url}`;
+
+const cachedText = async (url, text) => {
   try {
-    await AsyncStorage.setItem('cached_text', text);
-    console.log('Teks disimpan ke cache');
+    const key = generateCacheKey(url);
+    await AsyncStorage.setItem(key, text);
+    console.log('Text saved to cache:', key);
   } catch (error) {
-    console.error('Gagal simpan teks:', error);
+    console.error('Error saving to cache:', error);
   }
 };
 
-const getCachedText = async () => {
+const getCachedText = async url => {
   try {
-    const text = await AsyncStorage.getItem('cached_text');
+    const key = generateCacheKey(url);
+    const text = await AsyncStorage.getItem(key);
     return text;
   } catch (error) {
     console.error('Error fetching cache:', error);
@@ -108,26 +108,41 @@ const getCachedText = async () => {
   }
 };
 
-export const fetchContents = async () => {
+export const fetchContents = async (url, title = 'default') => {
+  console.log(`🔍 fetchContents called for: ${title}`);
   try {
-    const cached = await getCachedText();
-    if (cached) {
-      console.log('Fetching from cache:', cached);
+    // Cek cache
+    const cached = await getCachedText(title);
+    if (cached && cached.trim().length > 50) {
+      console.log(`🟢 Fetched from cache: ${title}`);
       return cached;
     }
 
-    const filePath = await downloadPDF();
+    // Kalau tidak ada cache, baru lanjut proses
+    console.log(`📥 Downloading PDF for: ${title}`);
+    const filePath = await downloadPDF(url);
+    console.log(`✅ Success Downloaded: ${filePath}`);
+
     const uploadedUrl = await uploadPDFtoPDFco(filePath);
-    if (!uploadedUrl) return null;
+    if (!uploadedUrl) {
+      console.error(`❌ Gagal upload PDF: ${title}`);
+      return null;
+    }
+
+    console.log(`🔗 Presigned URL: ${uploadedUrl}`);
 
     const parsedText = await convertPDFUrlToText(uploadedUrl);
-    if (!parsedText) return null;
+    if (!parsedText || parsedText.trim().length < 50) {
+      console.error(`❌ Parsing gagal atau hasil kosong untuk: ${title}`);
+      return null;
+    }
 
-    await cachedText(parsedText);
-    console.log('Parsing sukses:', parsedText);
+    // Simpan ke cache
+    await cachedText(title, parsedText);
+    console.log(`✅ Parsed & cached: ${title}`);
     return parsedText;
   } catch (err) {
-    console.error('Kesalahan proses:', err.message || err);
+    console.error(`🚨 Error fetchContents(${title}):`, err.message || err);
     return null;
   }
 };
