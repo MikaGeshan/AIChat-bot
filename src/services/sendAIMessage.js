@@ -23,6 +23,8 @@ ${parsedText}
 Berdasarkan dokumen di atas, mohon bantu jawab pertanyaan ini:
 "${question}"
 
+Jawaban harus dimulai dengan kalimat: "Menurut info dari data perusahaan, ..."
+
 Jika jawabannya tidak ditemukan dalam dokumen, cukup katakan tidak ada jawabannya.`,
   },
 ];
