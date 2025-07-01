@@ -6,48 +6,44 @@ import { fetchContents } from './fetchContents';
 const SYSTEM_PROMPT = {
   role: 'system',
   content:
-    'You are an AI Insurance Assistant. You will answer user questions based on the insurance-related documents provided. If the document includes the question and the answer, use it. If not found, say sorry Don’t guess if the information isn’t there.',
+    'You are an AI Insurance Assistant. You will answer user questions based on the insurance-related documents provided. If the document includes the question and the answer, use it. If not found, say sorry. Don’t guess if the information isn’t there.',
 };
 
-export const sendAIMessage = async messages => {
+export const sendAIMessage = async userQuestion => {
   try {
-    // Fetch dokumen dari folder
-    const files = await fetchContents();
+    const documentText = await fetchContents();
+    if (!documentText) {
+      throw new Error('Error fetching document contents');
+    }
 
-    const docString = files
-      .map(doc => `--- ${doc.name} ---\n${doc.content}`)
-      .join('\n\n');
-
-    const userQuestion = messages[messages.length - 1]?.content || '';
-
-    // Respon AI kepada pertanyaan user
-    const newMessage = {
+    const userPrompt = {
       role: 'user',
-      content: `Answer the following question based on the reference documents I provide. Do not display or mention the document contents in your answer.\n\nQuestion: "${userQuestion}"\n\nReference documents (for AI only, do not show to user):\n${docString}`,
+      content: `Berdasarkan informasi yang saya dapatkan dari database perusahaan:\n\n"""${documentText}"""\n\nPertanyaan saya:\n${userQuestion}\n\nTolong jawab sesuai dengan pertanyaan yang dilempar oleh user.`,
     };
-
-    const fullMessages = [SYSTEM_PROMPT, newMessage];
 
     const response = await axios.post(
       GROQ_API_URL,
       {
         model: GROQ_MODEL,
-        messages: fullMessages,
+        messages: [SYSTEM_PROMPT, userPrompt],
         temperature: 0.2,
-        stream: false,
+        max_tokens: 1024,
       },
       {
         headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${GROQ_API_KEY}`,
         },
       },
     );
 
-    const content = response?.data?.choices?.[0]?.message?.content;
-    return content || 'Sorry, I could not find an answer to your question.';
+    const aiMessage = response.data?.choices?.[0]?.message?.content;
+    return aiMessage || 'No answer from AI.';
   } catch (error) {
-    console.error('Groq AI error:', error?.response?.data || error.message);
-    return 'There was an error processing your request. Please try again later.';
+    console.error(
+      'Error while sending to AI:',
+      error.response?.data || error.message,
+    );
+    return 'Theres an error while sending to AI.';
   }
 };

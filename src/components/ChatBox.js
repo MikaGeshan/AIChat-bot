@@ -32,7 +32,8 @@ const ChatBox = forwardRef((_props, ref) => {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
-    const aiReply = await sendAIMessage(updatedMessages);
+    const aiReply = await sendAIMessage(text);
+
     setMessages(prev => [...prev, { role: 'assistant', content: aiReply }]);
   };
 

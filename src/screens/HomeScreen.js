@@ -5,13 +5,25 @@ import {
   View,
   ScrollView,
   Platform,
+  Button,
 } from 'react-native';
 import React, { useRef } from 'react';
 import ItemBox from '../components/ItemBox';
 import ChatBox from '../components/ChatBox';
+import { fetchContents } from '../services/fetchContents';
 import ActionButton from '../components/ActionButton';
 
 const HomeScreen = () => {
+  const handleFetch = async () => {
+    const content = await fetchContents();
+    if (content) {
+      console.log('PDF Parsed');
+      console.log(content);
+    } else {
+      console.log('Error fetching PDF Content');
+    }
+  };
+
   // properti data untuk item box
   const serviceData = [
     {
@@ -176,6 +188,7 @@ const HomeScreen = () => {
               ))}
             </View>
           </View>
+          <Button title="Test" onPress={handleFetch} />
           <View style={styles.chatBoxWrapper}>
             <ChatBox ref={chatBoxRef} />
           </View>

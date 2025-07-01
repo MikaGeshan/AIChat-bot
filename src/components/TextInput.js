@@ -16,6 +16,33 @@ const TextInput = ({ onSend }) => {
     setInput('');
   };
 
+  const styles = StyleSheet.create({
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      backgroundColor: 'white',
+      borderRadius: 8,
+      borderWidth: 0.5,
+      borderColor: '#d1d5db',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+    },
+    input: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 6,
+      fontSize: 13,
+      color: '#111',
+      marginRight: 6,
+      maxHeight: 100,
+    },
+    sendButton: {
+      backgroundColor: '#3b82f6',
+      padding: 8,
+      borderRadius: 6,
+    },
+  });
+
   return (
     <View style={styles.inputContainer}>
       <RNTextInput
@@ -34,30 +61,3 @@ const TextInput = ({ onSend }) => {
 };
 
 export default TextInput;
-
-const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: '#d1d5db',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    fontSize: 13,
-    color: '#111',
-    marginRight: 6,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: '#3b82f6',
-    padding: 8,
-    borderRadius: 6,
-  },
-});
