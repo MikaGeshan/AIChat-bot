@@ -1,30 +1,62 @@
 import RNFS from 'react-native-fs';
 import axios from 'axios';
 import { Buffer } from 'buffer';
-import { PDFCO_APIKEY } from '../config/folderConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PDFCO_APIKEY } from '../config/folderConfig';
 
-const downloadPDF = async (url, filename = 'sample.pdf') => {
-  const cachePath = `${RNFS.CachesDirectoryPath}/${filename}`;
+const generateCacheKey = title => `cached_text_${title}`;
 
-  const result = await RNFS.downloadFile({
-    fromUrl: url,
-    toFile: cachePath,
-  }).promise;
+const log = (label, message) => {
+  console.log(`[${label}] ${message}`);
+};
 
-  if (result.statusCode === 200) {
-    console.log('Success Downloaded:', cachePath);
-    return cachePath;
-  } else {
-    throw new Error(`Error downloading: ${result.statusCode}`);
+const logError = (label, error) => {
+  console.error(`[${label}]`, error.response?.data || error.message || error);
+};
+
+// Cache handling
+const getCachedText = async title => {
+  try {
+    const key = generateCacheKey(title);
+    const cached = await AsyncStorage.getItem(key);
+    return cached;
+  } catch (err) {
+    logError('Cache Read', err);
+    return null;
   }
 };
 
-const uploadPDFtoPDFco = async filePath => {
+const saveCachedText = async (title, text) => {
   try {
-    const fileName = 'sample.pdf';
+    const key = generateCacheKey(title);
+    await AsyncStorage.setItem(key, text);
+    log('Cache Write', `Saved text to ${key}`);
+  } catch (err) {
+    logError('Cache Write', err);
+  }
+};
 
-    const presignRes = await axios.get(
+// Download file from url
+const downloadPDF = async (url, filename = 'document.pdf') => {
+  const filePath = `${RNFS.CachesDirectoryPath}/${filename}`;
+
+  const result = await RNFS.downloadFile({ fromUrl: url, toFile: filePath })
+    .promise;
+
+  if (result.statusCode === 200) {
+    log('Download', `Success: ${filePath}`);
+    return filePath;
+  } else {
+    throw new Error(`Download failed with status ${result.statusCode}`);
+  }
+};
+
+// upload pdf to parse
+const uploadPDF = async filePath => {
+  try {
+    const fileName = 'upload.pdf';
+
+    const { data } = await axios.get(
       'https://api.pdf.co/v1/file/upload/get-presigned-url',
       {
         params: {
@@ -37,32 +69,25 @@ const uploadPDFtoPDFco = async filePath => {
       },
     );
 
-    const { presignedUrl, url } = presignRes.data;
-    console.log('Presigned URL:', url);
+    const { presignedUrl, url } = data;
 
-    const fileData = await RNFS.readFile(filePath, 'base64');
-    await axios.put(presignedUrl, Buffer.from(fileData, 'base64'), {
+    const base64File = await RNFS.readFile(filePath, 'base64');
+    await axios.put(presignedUrl, Buffer.from(base64File, 'base64'), {
       headers: { 'Content-Type': 'application/pdf' },
     });
 
     return url;
-  } catch (error) {
-    console.error(
-      'Error uploading to PDF.co:',
-      error.response?.data || error.message,
-    );
+  } catch (err) {
+    logError('Upload PDF', err);
     return null;
   }
 };
 
-const convertPDFUrlToText = async pdfUrl => {
+const convertPDFToText = async pdfUrl => {
   try {
-    const response = await axios.post(
+    const { data } = await axios.post(
       'https://api.pdf.co/v1/pdf/convert/to/text',
-      {
-        url: pdfUrl,
-        inline: true,
-      },
+      { url: pdfUrl, inline: true },
       {
         headers: {
           'x-api-key': PDFCO_APIKEY,
@@ -71,78 +96,53 @@ const convertPDFUrlToText = async pdfUrl => {
       },
     );
 
-    if (response.data.error) {
-      throw new Error(response.data.message);
-    }
+    if (data.error) throw new Error(data.message);
 
-    return response.data.body;
-  } catch (error) {
-    console.error(
-      'Error converting PDF to text:',
-      error.response?.data || error.message,
-    );
+    return data.body;
+  } catch (err) {
+    logError('Convert PDF', err);
     return null;
   }
 };
 
-const generateCacheKey = url => `cached_text_${url}`;
-
-const cachedText = async (url, text) => {
-  try {
-    const key = generateCacheKey(url);
-    await AsyncStorage.setItem(key, text);
-    console.log('Text saved to cache:', key);
-  } catch (error) {
-    console.error('Error saving to cache:', error);
-  }
-};
-
-const getCachedText = async url => {
-  try {
-    const key = generateCacheKey(url);
-    const text = await AsyncStorage.getItem(key);
-    return text;
-  } catch (error) {
-    console.error('Error fetching cache:', error);
-    return null;
-  }
-};
-
+// fetching all content
 export const fetchContents = async (url, title = 'default') => {
-  console.log(`fetchContents called for: ${title}`);
+  log('Fetch', `fetchContents called for: ${title}`);
+
   try {
-    // Cek cache
+    // checking cache
     const cached = await getCachedText(title);
     if (cached && cached.trim().length > 50) {
-      console.log(`Fetched from cache: ${title}`);
+      log('Fetch', `Fetched from cache: ${title}`);
       return cached;
     }
 
-    // Kalau tidak ada cache, baru lanjut proses
-    console.log(`Downloading PDF for: ${title}`);
-    const filePath = await downloadPDF(url);
-    console.log(`Success Downloaded: ${filePath}`);
+    // download pdf
+    const filePath = await downloadPDF(url, `${title}.pdf`);
 
-    const uploadedUrl = await uploadPDFtoPDFco(filePath);
+    // upload pdf
+    const uploadedUrl = await uploadPDF(filePath);
     if (!uploadedUrl) {
-      console.error(` Gagal upload PDF: ${title}`);
+      log('Fetch', `Upload gagal untuk: ${title}`);
       return null;
     }
 
-    console.log(`Presigned URL: ${uploadedUrl}`);
-
-    const parsedText = await convertPDFUrlToText(uploadedUrl);
+    // parse pdf to text
+    const parsedText = await convertPDFToText(uploadedUrl);
     if (!parsedText || parsedText.trim().length < 50) {
-      console.error(`Parsing gagal atau hasil kosong untuk: ${title}`);
+      log('Fetch', `Parsing gagal atau hasil kosong: ${title}`);
       return null;
     }
 
-    // Simpan ke cache
-    await cachedText(title, parsedText);
-    console.log(`Parsed & cached: ${title}`);
+    // save to cache
+    await saveCachedText(title, parsedText);
+    log('Fetch', `Parsed & cached: ${title}`);
+
     return parsedText;
   } catch (err) {
-    console.error(`Error fetchContents(${title}):`, err.message || err);
+    logError(`FetchContents(${title})`, err);
     return null;
   }
 };
+
+export { getCachedText };
