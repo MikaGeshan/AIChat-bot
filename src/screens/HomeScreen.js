@@ -188,7 +188,6 @@ const HomeScreen = () => {
               ))}
             </View>
           </View>
-          <Button title="Test" onPress={handleFetch} />
           <View style={styles.chatBoxWrapper}>
             <ChatBox ref={chatBoxRef} />
           </View>
