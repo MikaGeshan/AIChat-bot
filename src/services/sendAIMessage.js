@@ -2,20 +2,37 @@ import axios from 'axios';
 import { GROQ_API_KEY, GROQ_API_URL, GROQ_MODEL } from '../config/aiConfig';
 import { LIST_JSON_URL } from '../config/githubConfig';
 import { fetchContents, getCachedText } from './fetchContents';
-import { extractKeywords, matchList } from './matchList';
+import { getExpandedKeywords, matchList } from './matchList';
+import { detectLanguage } from './detectLanguage';
 
 let lastContext = { title: null, url: null, parsedText: null };
 
 const SYSTEM_PROMPT = {
   role: 'system',
-  content: `You are an AI Insurance Assistant. You will answer user questions based on the insurance-related documents provided. If the document includes the question and the answer, use it. If not found, say sorry. Don’t guess if the information isn’t there.`,
+  content: `You are an AI Insurance Assistant. You answer user questions based solely on the provided insurance-related documents. 
+
+If the document contains relevant information, use it to construct your answer. If not, simply say the answer is not available.
+
+The document may be written in Indonesian. If the user's question is in English, translate relevant parts from the document and respond in English. If the user's question is in Indonesian, respond in Indonesian. Do not guess or fabricate information.`,
 };
 
-const buildFinalMessages = (parsedText, question) => [
-  SYSTEM_PROMPT,
-  {
-    role: 'user',
-    content: `
+const buildFinalMessages = (parsedText, question) => {
+  const lang = detectLanguage(question);
+
+  const userPrompt =
+    lang === 'en'
+      ? `
+I have the following document containing important information:
+
+${parsedText}
+
+Based on the document above, please help answer this question:
+"${question}"
+
+The answer must begin with: "According to the company data, ..."
+
+If the answer is not found in the document, just say there's no answer available.`
+      : `
 Saya memiliki dokumen berikut yang berisi informasi penting:
 
 ${parsedText}
@@ -25,9 +42,16 @@ Berdasarkan dokumen di atas, mohon bantu jawab pertanyaan ini:
 
 Jawaban harus dimulai dengan kalimat: "Menurut info dari data perusahaan, ..."
 
-Jika jawabannya tidak ditemukan dalam dokumen, cukup katakan tidak ada jawabannya.`,
-  },
-];
+Jika jawabannya tidak ditemukan dalam dokumen, cukup katakan tidak ada jawabannya.`;
+
+  return [
+    SYSTEM_PROMPT,
+    {
+      role: 'user',
+      content: userPrompt.trim(),
+    },
+  ];
+};
 
 const getUserQuestion = messages => {
   return messages.find(msg => msg.role === 'user')?.content || null;
@@ -69,25 +93,31 @@ export const sendAIMessage = async messages => {
     const question = getUserQuestion(messages);
     if (!question) throw new Error('[AI] User message not found');
 
-    const keywords = extractKeywords(question);
+    const lang = detectLanguage(question);
+    const keywords = getExpandedKeywords(question, lang);
+
     let matchedDoc;
 
-    // cek apakah follow up question
-    const isFollowUp = isFollowUpQuestion(keywords, lastContext.title);
+    // cek apakah follow up
+    const isFollowUp = isFollowUpQuestion(keywords, lastContext?.title);
 
     if (isFollowUp) {
-      console.log(`🔁 [AI] Using previous context: ${lastContext.title}`);
+      console.log(`[AI] Using previous context: ${lastContext.title}`);
       matchedDoc = lastContext;
     } else {
       matchedDoc = await fetchMatchingDocument(question, keywords);
-      if (!matchedDoc)
-        return 'Maaf, tidak ditemukan dokumen yang relevan atau dokumen gagal diproses.';
+
+      if (!matchedDoc) {
+        return lang === 'en'
+          ? 'Sorry, no relevant document found. Please contact our agent for further assistance.'
+          : 'Maaf, dokumen yang relevan tidak ditemukan. Silakan hubungi agen kami untuk bantuan lebih lanjut.';
+      }
 
       lastContext = matchedDoc;
-      console.log(`✅ [AI] New match: ${matchedDoc.title}`);
+      console.log(`[AI] New match: ${matchedDoc.title}`);
     }
 
-    // respon ai
+    // Kirim ke AI
     const response = await axios.post(
       GROQ_API_URL,
       {
@@ -103,9 +133,14 @@ export const sendAIMessage = async messages => {
     );
 
     const reply = response.data.choices?.[0]?.message?.content?.trim();
-    return reply || 'Maaf, AI tidak menemukan jawaban yang sesuai.';
+    return (
+      reply ||
+      (lang === 'en'
+        ? 'Sorry, AI could not answer the question.'
+        : 'Maaf, AI tidak bisa menjawab pertanyaannya.')
+    );
   } catch (err) {
     console.error('[AI ERROR]', err.message || err);
-    return 'Terjadi kesalahan saat memproses pertanyaan Anda.';
+    return 'There was a problem while processing your question.';
   }
 };
