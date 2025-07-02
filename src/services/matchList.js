@@ -31,30 +31,43 @@ export const extractKeywords = text => {
 
 export const matchList = (question, list, cacheTexts = {}) => {
   const keywords = extractKeywords(question);
-  let bestMatch = null;
-  let bestScore = 0;
 
-  for (const item of list) {
-    const titleScore =
-      keywords.filter(w => item.title.toLowerCase().includes(w)).length /
-      keywords.length;
-    const bodyScore = cacheTexts[item.title]
-      ? keywords.filter(w => cacheTexts[item.title].toLowerCase().includes(w))
-          .length / keywords.length
-      : 0;
+  if (keywords.length === 0) {
+    console.warn('[Match] Tidak ada keyword yang valid ditemukan.');
+    return null;
+  }
+
+  const scoredItems = list.map(item => {
+    const title = item.title.toLowerCase();
+    const body = cacheTexts[item.title]?.toLowerCase() || '';
+
+    const titleMatches = keywords.filter(w => title.includes(w)).length;
+    const bodyMatches = keywords.filter(w => body.includes(w)).length;
+
+    const titleScore = titleMatches / keywords.length;
+    const bodyScore = bodyMatches / keywords.length;
+
+    const finalScore = titleScore * 2 + bodyScore;
 
     console.log(
       `[Match Check] ${item.title}: titleScore=${titleScore.toFixed(
         2,
-      )}, bodyScore=${bodyScore.toFixed(2)}`,
+      )}, bodyScore=${bodyScore.toFixed(2)}, finalScore=${finalScore.toFixed(
+        2,
+      )}`,
     );
-    const score = Math.max(titleScore, bodyScore);
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = item;
-    }
-  }
+    return {
+      item,
+      finalScore,
+    };
+  });
 
-  return bestScore > 0.1 ? bestMatch : null;
+  const sorted = scoredItems
+    .filter(s => s.finalScore > 0)
+    .sort((a, b) => b.finalScore - a.finalScore);
+
+  const best = sorted[0];
+
+  return best?.finalScore > 0.1 ? best.item : null;
 };

@@ -29,53 +29,65 @@ Jika jawabannya tidak ditemukan dalam dokumen, cukup katakan tidak ada jawabanny
   },
 ];
 
+const getUserQuestion = messages => {
+  return messages.find(msg => msg.role === 'user')?.content || null;
+};
+
+const isFollowUpQuestion = (keywords, contextTitle) => {
+  if (!contextTitle) return false;
+  return keywords.some(word => contextTitle.toLowerCase().includes(word));
+};
+
+const fetchMatchingDocument = async question => {
+  const listResponse = await axios.get(LIST_JSON_URL);
+  const documentList = listResponse.data;
+
+  const cacheTexts = {};
+  for (const item of documentList) {
+    const cached = await getCachedText(item.title);
+    if (cached) cacheTexts[item.title] = cached;
+  }
+
+  const bestMatch = matchList(question, documentList, cacheTexts);
+  if (!bestMatch) return null;
+
+  const parsedText =
+    cacheTexts[bestMatch.title] ||
+    (await fetchContents(bestMatch.url, bestMatch.title));
+
+  if (!parsedText) return null;
+
+  return {
+    title: bestMatch.title,
+    url: bestMatch.url,
+    parsedText,
+  };
+};
+
 export const sendAIMessage = async messages => {
   try {
-    const userMessage = messages.find(msg => msg.role === 'user');
-    if (!userMessage) throw new Error('[AI] User message not found');
+    const question = getUserQuestion(messages);
+    if (!question) throw new Error('[AI] User message not found');
 
-    const question = userMessage.content;
     const keywords = extractKeywords(question);
+    let matchedDoc;
 
-    let matchedDoc = null;
-
-    // cek konteks untuk pertanyaan follow up
-    const isFollowUp =
-      lastContext.title &&
-      keywords.some(word => lastContext.title.toLowerCase().includes(word));
+    // cek apakah follow up question
+    const isFollowUp = isFollowUpQuestion(keywords, lastContext.title);
 
     if (isFollowUp) {
       console.log(`🔁 [AI] Using previous context: ${lastContext.title}`);
       matchedDoc = lastContext;
     } else {
-      const res = await axios.get(LIST_JSON_URL);
-      const list = res.data;
-
-      const cacheTexts = {};
-      for (const item of list) {
-        const cached = await getCachedText(item.title);
-        if (cached) cacheTexts[item.title] = cached;
-      }
-
-      const bestMatch = matchList(question, list, cacheTexts);
-      if (!bestMatch) return 'Maaf, tidak ditemukan dokumen yang relevan.';
-
-      const parsedText =
-        cacheTexts[bestMatch.title] ||
-        (await fetchContents(bestMatch.url, bestMatch.title));
-      if (!parsedText) return `Gagal memproses dokumen: ${bestMatch.title}`;
-
-      matchedDoc = {
-        title: bestMatch.title,
-        url: bestMatch.url,
-        parsedText,
-      };
+      matchedDoc = await fetchMatchingDocument(question, keywords);
+      if (!matchedDoc)
+        return 'Maaf, tidak ditemukan dokumen yang relevan atau dokumen gagal diproses.';
 
       lastContext = matchedDoc;
-      console.log(`[AI] New match: ${matchedDoc.title}`);
+      console.log(`✅ [AI] New match: ${matchedDoc.title}`);
     }
 
-    // ai response
+    // respon ai
     const response = await axios.post(
       GROQ_API_URL,
       {
