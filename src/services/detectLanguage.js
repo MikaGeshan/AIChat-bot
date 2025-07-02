@@ -90,6 +90,9 @@ export const synonymMapByLang = {
     file: ['ajukan', 'pengajuan'],
     'file a claim': ['pengajuan klaim', 'ajukan klaim'],
     how: ['cara', 'bagaimana'],
+    policy: ['polis', 'hak customer', 'hak yang diberikan'],
+    privacy: ['data', 'our data', 'customer data'],
+    information: ['informasi', 'penyimpanan data'],
     procedure: ['prosedur', 'langkah', 'cara'],
   },
 };
