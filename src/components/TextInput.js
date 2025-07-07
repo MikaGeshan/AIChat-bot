@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  TextInput as RNTextInput,
-  TouchableOpacity,
-} from 'react-native';
-import { Send } from 'lucide-react-native';
+import { StyleSheet, View, TextInput as RNTextInput } from 'react-native';
+import ButtonSend from './ButtonSend';
 
 const TextInput = ({ onSend }) => {
   const [input, setInput] = useState('');
@@ -36,11 +31,6 @@ const TextInput = ({ onSend }) => {
       marginRight: 6,
       maxHeight: 100,
     },
-    sendButton: {
-      backgroundColor: '#3b82f6',
-      padding: 8,
-      borderRadius: 6,
-    },
   });
 
   return (
@@ -53,9 +43,7 @@ const TextInput = ({ onSend }) => {
         onChangeText={setInput}
         onSubmitEditing={handleSend}
       />
-      <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-        <Send size={18} color="white" />
-      </TouchableOpacity>
+      <ButtonSend onPress={handleSend} />
     </View>
   );
 };

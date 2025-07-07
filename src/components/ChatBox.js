@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, forwardRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,35 +7,48 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { sendAIMessage } from '../services/sendAIMessage';
 import TextInput from './TextInput';
+import { groqResponse } from '../services/groqResponse';
+import BubbleChat from './BubbleChat';
 
-const ChatBox = forwardRef((_props, ref) => {
-  const scrollRef = useRef();
-
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content:
-        "Hello! I'm your AI Insurance Assistant. I'm here to help you with claims, quotes, policy information, and answer any insurance questions you might have. How can I assist you today?",
-    },
-  ]);
-
-  const handleSend = async text => {
-    const userMessage = { role: 'user', content: text };
-    console.log(userMessage);
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-
-    const aiReply = await sendAIMessage([userMessage]);
-    console.log(sendAIMessage);
-
-    setMessages(prev => [...prev, { role: 'assistant', content: aiReply }]);
-  };
+const ChatBox = () => {
+  const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+    setMessages([
+      {
+        role: 'assistant',
+        content:
+          "Hello! I'm your AI Insurance Assistant. I'm here to help you with claims, quotes, policy information, and answer any insurance questions you might have. How can I assist you today?",
+      },
+    ]);
+  }, []);
+
+  const handleSend = async userMessage => {
+    setMessages(prev => [
+      ...prev,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: '...' },
+    ]);
+
+    try {
+      const aiReply = await groqResponse(userMessage);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'assistant', content: aiReply };
+        return updated;
+      });
+    } catch (err) {
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: 'assistant',
+          content: 'Terjadi kesalahan saat memproses jawaban.',
+        };
+        return updated;
+      });
+    }
+  };
 
   const styles = StyleSheet.create({
     wrapper: {
@@ -80,23 +93,6 @@ const ChatBox = forwardRef((_props, ref) => {
       paddingVertical: 10,
       gap: 10,
     },
-    chatBubble: {
-      borderRadius: 12,
-      padding: 12,
-      maxWidth: '80%',
-    },
-    assistantBubble: {
-      backgroundColor: '#f1f5f9',
-      alignSelf: 'flex-start',
-    },
-    userBubble: {
-      backgroundColor: '#dbeafe',
-      alignSelf: 'flex-end',
-    },
-    chatText: {
-      fontSize: 13,
-      color: '#111',
-    },
     inputWrapper: {
       marginTop: 4,
     },
@@ -124,23 +120,17 @@ const ChatBox = forwardRef((_props, ref) => {
         </View>
       </View>
 
-      {/* Map User Message yang terkirim */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={styles.chatContainer}
-        ref={scrollRef}
         showsVerticalScrollIndicator={false}
       >
         {messages.map((msg, idx) => (
-          <View
+          <BubbleChat
             key={idx}
-            style={[
-              styles.chatBubble,
-              msg.role === 'user' ? styles.userBubble : styles.assistantBubble,
-            ]}
-          >
-            <Text style={styles.chatText}>{msg.content}</Text>
-          </View>
+            message={msg.content}
+            isUserChat={msg.role === 'user'}
+          />
         ))}
       </ScrollView>
 
@@ -154,6 +144,6 @@ const ChatBox = forwardRef((_props, ref) => {
       </Text>
     </KeyboardAvoidingView>
   );
-});
+};
 
 export default ChatBox;
